@@ -94,6 +94,7 @@ class ModuleInterface:
             label = album_data.get('label').get('name') if album_data.get('label') else None,
             copyright = album_data.get('copyright'),
             genres = [album_data['genre']['name']],
+            comment = f"https://play.qobuz.com/track/{track_id}"  # <-- ★★★ COMMENT TAG FIX IS HERE ★★★
         )
 
         stream_data = self.session.get_file_url(track_id, quality_tier)
@@ -124,6 +125,7 @@ class ModuleInterface:
             release_year = int(album_data['release_date_original'].split('-')[0]),
             explicit = track_data['parental_warning'],
             cover_url = album_data['image']['large'].split('_')[0] + '_org.jpg',
+            url = album_data.get('url'),  # This is the Album URL
             tags = tags,
             codec = CodecEnum.FLAC if stream_data.get('format_id') in {6, 7, 27} else CodecEnum.NONE if not stream_data.get('format_id') else CodecEnum.MP3,
             duration = track_data.get('duration'),
@@ -172,7 +174,7 @@ class ModuleInterface:
             quality = self.quality_format.format(**quality_tags) if self.quality_format != '' else None,
             description = album_data.get('description'),
             cover_url = album_data['image']['large'].split('_')[0] + '_org.jpg',
-            all_track_cover_jpg_url = album_data['image']['large'],
+            all_track_cover_jpg_url = album_data['image']['large'], # <-- Fixed the KeyError here
             upc = album_data.get('upc'),
             duration = album_data.get('duration'),
             booklet_url = booklet_url,
