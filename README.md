@@ -42,7 +42,7 @@ Follow these steps to get a local copy of Orpheus up and running:
 
 1. Clone the repo inside the folder `orpheusdl/modules/`
    ```sh
-   git clone https://github.com/yarrm80s/orpheusdl-qobuz.git qobuz
+   git clone https://github.com/zasdrioX/orpheusdl-qobuz.git qobuz
    ```
 2. Execute:
    ```sh
