@@ -9,7 +9,8 @@ from .qobuz_api import Qobuz
 
 module_information = ModuleInformation(
     service_name = 'Qobuz',
-    module_supported_modes = ModuleModes.download | ModuleModes.credits,
+    module_supported_modes = ModuleModes.download | ModuleModes.credits | ModuleModes.covers,
+    flags = ModuleFlags.needs_cover_resize,
     global_settings = {'app_id': '', 'app_secret': '', 'quality_format': '{sample_rate}kHz {bit_depth}bit'},
     session_settings = {'username': '', 'password': ''},
     session_storage_variables = ['token'],
@@ -94,7 +95,7 @@ class ModuleInterface:
             label = album_data.get('label').get('name') if album_data.get('label') else None,
             copyright = album_data.get('copyright'),
             genres = [album_data['genre']['name']],
-            comment = f"https://play.qobuz.com/track/{track_id}"  # <-- ★★★ COMMENT TAG FIX IS HERE ★★★
+            comment = f"https://play.qobuz.com/track/{track_id}"
         )
 
         stream_data = self.session.get_file_url(track_id, quality_tier)
@@ -113,6 +114,12 @@ class ModuleInterface:
         album_name = album_data.get('title').rstrip()
         album_name += f' ({album_data.get("version")})' if album_data.get("version") else ''
 
+        # --- START OF COVER FIX (Track) ---
+        cover_url = None
+        if album_data.get('image') and album_data['image'].get('large'):
+            cover_url = album_data['image']['large'].split('_')[0] + '_org.jpg'
+        # --- END OF COVER FIX (Track) ---
+
         return TrackInfo(
             name = track_name,
             album_id = album_data['id'],
@@ -124,8 +131,8 @@ class ModuleInterface:
             sample_rate = stream_data['sampling_rate'],
             release_year = int(album_data['release_date_original'].split('-')[0]),
             explicit = track_data['parental_warning'],
-            cover_url = album_data['image']['large'].split('_')[0] + '_org.jpg',
-            url = album_data.get('url'),  # This is the Album URL
+            cover_url = cover_url,  # <-- Use the safe variable
+            url = album_data.get('url'),
             tags = tags,
             codec = CodecEnum.FLAC if stream_data.get('format_id') in {6, 7, 27} else CodecEnum.NONE if not stream_data.get('format_id') else CodecEnum.MP3,
             duration = track_data.get('duration'),
@@ -136,6 +143,32 @@ class ModuleInterface:
 
     def get_track_download(self, url):
         return TrackDownloadInfo(download_type=DownloadEnum.URL, file_url=url)
+
+    def get_track_cover(self, track_id: str, cover_options: CoverOptions, data=None) -> CoverInfo:
+        if data is None:
+            data = {}
+
+        track_data = data.get(track_id) or self.session.get_track(track_id)
+        album_data = track_data.get('album', {})
+
+        cover_url = None
+        # --- Use the file_type from settings, default to jpg ---
+        cover_type = cover_options.file_type if cover_options.file_type else ImageFileTypeEnum.jpg
+
+        if album_data.get('image') and album_data['image'].get('large'):
+            # We ignore cover_options.resolution and just get the best quality
+            # The downloader utility will handle resizing
+            cover_url = album_data['image']['large'].split('_')[0] + '_org.jpg'
+        
+        if not cover_url:
+            # Fallback if no cover is found at all
+            cover_url = 'https://placehold.co/600x600/101010/FFFFFF?text=No+Cover'
+            cover_type = ImageFileTypeEnum.png
+
+        return CoverInfo(
+            url=cover_url,
+            file_type=cover_type
+        )
 
     def get_album_info(self, album_id):
         album_data = self.session.get_album(album_id)
@@ -173,8 +206,10 @@ class ModuleInterface:
             explicit = album_data['parental_warning'],
             quality = self.quality_format.format(**quality_tags) if self.quality_format != '' else None,
             description = album_data.get('description'),
-            cover_url = album_data['image']['large'].split('_')[0] + '_org.jpg',
-            all_track_cover_jpg_url = album_data['image']['large'], # <-- Fixed the KeyError here
+            cover_url = (album_data['image']['large'].split('_')[0] + '_org.jpg') if album_data.get('image') and album_data['image'].get('large') else None,
+            # --- START OF EMBED COVER FIX (Album) ---
+            all_track_cover_jpg_url = (album_data['image']['large'].split('_')[0] + '_org.jpg') if album_data.get('image') and album_data['image'].get('large') else None,
+            # --- END OF EMBED COVER FIX (Album) ---
             upc = album_data.get('upc'),
             duration = album_data.get('duration'),
             booklet_url = booklet_url,
